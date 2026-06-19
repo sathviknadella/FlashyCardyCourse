@@ -1,0 +1,52 @@
+---
+description: Data retrieval must always be done by server components
+alwaysApply: true
+---
+
+# Server Components for Data Retrieval
+
+All data fetching must happen in **server components**. Never fetch data directly inside client components.
+
+## Rules
+
+- Mark data-fetching components as `async` server components (no `"use client"` directive)
+- Pass fetched data down to client components as props
+- Use server actions for mutations, not data fetching
+- Never call `fetch`, database queries, or server actions that return data from a `"use client"` component
+
+## Examples
+
+```tsx
+// ✅ GOOD — server component fetches data
+// app/decks/page.tsx (no "use client")
+import { db } from "@/db";
+import { auth } from "@clerk/nextjs/server";
+import { DeckList } from "@/components/DeckList";
+
+export default async function DecksPage() {
+  const { userId } = await auth();
+  const decks = await db.query.decks.findMany({
+    where: eq(decks.userId, userId),
+  });
+  return <DeckList decks={decks} />;
+}
+```
+
+```tsx
+// ❌ BAD — client component fetching data directly
+"use client";
+import { useEffect, useState } from "react";
+
+export function DeckList() {
+  const [decks, setDecks] = useState([]);
+  useEffect(() => {
+    fetch("/api/decks").then(...); // ❌ fetch in client
+  }, []);
+}
+```
+
+## Pattern
+
+```
+Page (server, async) → fetches data → passes as props → Client Component (display/interactivity)
+```

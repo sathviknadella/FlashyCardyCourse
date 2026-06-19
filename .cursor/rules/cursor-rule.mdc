@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+
+This project uses shadcn ui for all it's ui elements. If shadcn ui is not initialized in our project use the following command: 
+npx shadcn@latest init
+
+If a component is not installed from shadcn ui, use the following command (for example if there a button component missing): 
+npx shadcn@latest add button

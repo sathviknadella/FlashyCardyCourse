@@ -1,0 +1,57 @@
+---
+description: Clerk authentication and user data isolation rules
+alwaysApply: true
+---
+
+# Clerk Authentication & Data Isolation
+
+All authentication is handled by **Clerk**. Every data access must be scoped to the authenticated user — users must never be able to read or modify data belonging to another user.
+
+## Getting the Current User
+
+Always use Clerk's server-side helpers to get the authenticated user ID. Never trust user-supplied IDs from request bodies or query params as the identity source.
+
+```typescript
+// ✅ GOOD — server action / route handler
+import { auth } from "@clerk/nextjs/server";
+
+const { userId } = await auth();
+if (!userId) throw new Error("Unauthenticated");
+
+// Use userId to scope all DB queries
+const decks = await db.query.decks.findMany({
+  where: eq(decks.userId, userId),
+});
+```
+
+```typescript
+// ❌ BAD — never trust client-supplied userId
+const { userId } = req.body; // attacker can forge this
+const decks = await db.query.decks.findMany({
+  where: eq(decks.userId, userId),
+});
+```
+
+## Mutating Data (update / delete)
+
+Always verify ownership before mutating. Fetch the record and confirm `record.userId === userId` before proceeding.
+
+```typescript
+// ✅ GOOD
+const { userId } = await auth();
+const deck = await db.query.decks.findFirst({ where: eq(decks.id, deckId) });
+
+if (!deck || deck.userId !== userId) {
+  throw new Error("Forbidden");
+}
+
+await db.delete(decks).where(eq(decks.id, deckId));
+```
+
+## Rules
+
+- Always call `auth()` (server) or `useAuth()` (client) from `@clerk/nextjs` — never roll your own session logic.
+- Every DB query that returns user-specific data **must** include a `userId` filter.
+- Every mutation (insert, update, delete) **must** verify the record belongs to the current user before executing.
+- Return generic `"Forbidden"` / `404` errors — never leak whether a resource exists to an unauthorized user.
+- Protect all API routes and server actions; never assume a route is safe because it's "internal".

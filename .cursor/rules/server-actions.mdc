@@ -1,0 +1,49 @@
+---
+description: Server actions, Zod validation, and typed inputs for all mutations
+alwaysApply: true
+---
+
+# Server Actions & Data Validation
+
+All mutations (inserts, updates, deletes) must go through **server actions**. All inputs must be validated with **Zod** and typed with TypeScript — never use `FormData` as a parameter type.
+
+## Rules
+
+- Every insert, update, and delete must be implemented as a server action (`"use server"`)
+- All data passed to server actions must be validated with Zod before use
+- Define a Zod schema and infer the TypeScript type from it — never write the type manually
+- Never accept `FormData` as a parameter type in server actions
+
+## Pattern
+
+```typescript
+// ✅ GOOD
+"use server";
+import { z } from "zod";
+import { auth } from "@clerk/nextjs/server";
+
+const createDeckSchema = z.object({
+  title: z.string().min(1).max(100),
+  description: z.string().optional(),
+});
+
+type CreateDeckInput = z.infer<typeof createDeckSchema>;
+
+export async function createDeck(input: CreateDeckInput) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthenticated");
+
+  const parsed = createDeckSchema.safeParse(input);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  await db.insert(decks).values({ ...parsed.data, userId });
+}
+```
+
+```typescript
+// ❌ BAD — FormData type, no Zod validation
+export async function createDeck(formData: FormData) {
+  const title = formData.get("title") as string;
+  await db.insert(decks).values({ title });
+}
+```
