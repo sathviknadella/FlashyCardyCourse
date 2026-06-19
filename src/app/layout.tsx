@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { ClerkProvider, Show, UserButton } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
-import { AuthButtons } from "@/components/auth-buttons";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -26,9 +25,6 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <ClerkProvider appearance={{ theme: dark }}>
           <header>
-            <Show when="signed-out">
-              <AuthButtons />
-            </Show>
             <Show when="signed-in">
               <UserButton />
             </Show>
