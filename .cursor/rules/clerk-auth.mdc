@@ -7,6 +7,32 @@ alwaysApply: true
 
 All authentication is handled by **Clerk**. Every data access must be scoped to the authenticated user — users must never be able to read or modify data belonging to another user.
 
+## Protected Pages & Unauthenticated Access
+
+This app has **no dedicated sign-in page**. Sign-in and sign-up are triggered via modal buttons on the homepage (`/`).
+
+When a user tries to access a protected page without being authenticated, **redirect them to the homepage** (`/`) — never to a `/sign-in` route.
+
+```typescript
+// ✅ GOOD — redirect unauthenticated users to the homepage
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+
+const { userId } = await auth();
+if (!userId) redirect("/");
+```
+
+```typescript
+// ❌ BAD — redirecting to a sign-in page that does not exist
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+
+const { userId } = await auth();
+if (!userId) redirect("/sign-in"); // ❌ this page does not exist
+```
+
+Also ensure `clerkMiddleware` in `middleware.ts` does **not** set `signInUrl` to a `/sign-in` route. Leave it unset or point it to `/`.
+
 ## Getting the Current User
 
 Always use Clerk's server-side helpers to get the authenticated user ID. Never trust user-supplied IDs from request bodies or query params as the identity source.
@@ -51,6 +77,7 @@ await db.delete(decks).where(eq(decks.id, deckId));
 ## Rules
 
 - Always call `auth()` (server) or `useAuth()` (client) from `@clerk/nextjs` — never roll your own session logic.
+- Unauthenticated users accessing protected pages must be redirected to `/` (the homepage), never to `/sign-in`.
 - Every DB query that returns user-specific data **must** include a `userId` filter.
 - Every mutation (insert, update, delete) **must** verify the record belongs to the current user before executing.
 - Return generic `"Forbidden"` / `404` errors — never leak whether a resource exists to an unauthorized user.

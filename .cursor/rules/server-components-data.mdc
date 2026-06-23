@@ -1,34 +1,88 @@
 ---
-description: Data retrieval must always be done by server components
+description: Data retrieval must always be done by server components via helper functions in db/queries
 alwaysApply: true
 ---
 
 # Server Components for Data Retrieval
 
-All data fetching must happen in **server components**. Never fetch data directly inside client components.
+All data fetching must happen in **server components**. Never fetch data directly inside client components. All database access — both reads and mutations — must go through **helper functions defined in `db/queries/`**, never inline raw Drizzle queries in pages, components, or server actions.
 
 ## Rules
 
 - Mark data-fetching components as `async` server components (no `"use client"` directive)
 - Pass fetched data down to client components as props
 - Use server actions for mutations, not data fetching
-- Never call `fetch`, database queries, or server actions that return data from a `"use client"` component
+- Never call `fetch`, raw database queries, or server actions that return data from a `"use client"` component
+- **All DB reads must call a helper function from `db/queries/`** — never write `db.query.*` or `db.select()` inline in a page or server action
+- **All DB mutations must call a helper function from `db/queries/`** — never write `db.insert()`, `db.update()`, or `db.delete()` inline in a server action
+
+## File Structure
+
+```
+db/
+  index.ts          ← Drizzle client instance
+  schema.ts         ← table definitions
+  queries/
+    decks.ts        ← all deck-related reads & writes
+    cards.ts        ← all card-related reads & writes
+    ...
+```
 
 ## Examples
 
-```tsx
-// ✅ GOOD — server component fetches data
-// app/decks/page.tsx (no "use client")
+```ts
+// ✅ GOOD — db/queries/decks.ts
 import { db } from "@/db";
+import { decks } from "@/db/schema";
+import { eq } from "drizzle-orm";
+
+export async function getDecksByUser(userId: string) {
+  return db.query.decks.findMany({ where: eq(decks.userId, userId) });
+}
+
+export async function createDeck(userId: string, title: string) {
+  return db.insert(decks).values({ userId, title });
+}
+```
+
+```tsx
+// ✅ GOOD — server component calls query helper
+// app/decks/page.tsx (no "use client")
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { getDecksByUser } from "@/db/queries/decks";
 import { DeckList } from "@/components/DeckList";
 
 export default async function DecksPage() {
   const { userId } = await auth();
-  const decks = await db.query.decks.findMany({
-    where: eq(decks.userId, userId),
-  });
+  if (!userId) redirect("/");
+
+  const decks = await getDecksByUser(userId);
   return <DeckList decks={decks} />;
+}
+```
+
+```ts
+// ✅ GOOD — server action calls mutation helper
+"use server";
+import { auth } from "@clerk/nextjs/server";
+import { createDeck } from "@/db/queries/decks";
+
+export async function createDeckAction(input: { title: string }) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthenticated");
+  await createDeck(userId, input.title);
+}
+```
+
+```tsx
+// ❌ BAD — raw DB query inline in a page
+import { db } from "@/db";
+import { eq } from "drizzle-orm";
+import { decks } from "@/db/schema";
+
+export default async function DecksPage() {
+  const decks = await db.query.decks.findMany(...); // ❌ inline query
 }
 ```
 
@@ -48,5 +102,7 @@ export function DeckList() {
 ## Pattern
 
 ```
-Page (server, async) → fetches data → passes as props → Client Component (display/interactivity)
+db/queries/*.ts (helper fns) ← called by →
+  Page (server, async) → passes data as props → Client Component (display/interactivity)
+  Server Action → calls mutation helper → returns result
 ```

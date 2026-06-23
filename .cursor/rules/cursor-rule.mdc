@@ -2,8 +2,62 @@
 alwaysApply: true
 ---
 
-This project uses shadcn ui for all it's ui elements. If shadcn ui is not initialized in our project use the following command: 
-npx shadcn@latest init
+# UI Component Rules
 
-If a component is not installed from shadcn ui, use the following command (for example if there a button component missing): 
-npx shadcn@latest add button
+This project uses **shadcn/ui exclusively** for all UI elements. No custom UI components may be created under any circumstances.
+
+## Rules
+
+- **Only shadcn/ui components** are permitted for all UI — buttons, inputs, dialogs, cards, forms, etc.
+- **Never** create custom-styled components, raw HTML elements with inline styles, or hand-rolled CSS classes for UI purposes.
+- If shadcn/ui is not initialized, run: `npx shadcn@latest init`
+- If a required component is not yet installed, add it before use. Example: `npx shadcn@latest add button`
+
+## Dark Mode Theme
+
+The project theme is **dark mode**. All components must respect dark mode contrast rules:
+
+- **Never** use dark text on dark backgrounds — always ensure sufficient contrast.
+- Text on dark backgrounds must use light colors (e.g. `text-white`, `text-foreground`, `text-muted-foreground`).
+- Avoid Tailwind classes like `text-gray-800`, `text-black`, or `text-zinc-900` on dark surfaces.
+- When using shadcn/ui components, rely on their CSS variable-based tokens (`foreground`, `muted-foreground`, `card-foreground`, etc.) which are dark-mode-aware.
+- Always verify new UI against a dark background — no component should be invisible or unreadable due to low contrast.
+
+```tsx
+// ✅ GOOD — uses theme-aware tokens, readable on dark backgrounds
+<p className="text-foreground">Visible text</p>
+<p className="text-muted-foreground">Secondary text</p>
+
+// ❌ BAD — dark text invisible on dark backgrounds
+<p className="text-gray-900">Hidden text</p>
+<p className="text-black">Hidden text</p>
+```
+
+## Clerk Authentication UI
+
+- All Clerk sign-in and sign-up **trigger buttons must use the shadcn/ui `<Button>` component** — never Clerk's default styled buttons.
+- Clerk must be configured to launch sign-in and sign-up via a **modal**, not a redirect to a separate page.
+- Use Clerk's `<SignInButton mode="modal">` and `<SignUpButton mode="modal">` props to enable modal behavior.
+
+```tsx
+// ✅ GOOD — shadcn/ui Button triggers Clerk modal
+import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
+
+<SignInButton mode="modal">
+  <Button variant="outline">Sign In</Button>
+</SignInButton>
+
+<SignUpButton mode="modal">
+  <Button>Sign Up</Button>
+</SignUpButton>
+```
+
+```tsx
+// ❌ BAD — custom button or Clerk default button, or redirect mode
+<SignInButton /> // Clerk's default styled button
+<button onClick={...}>Sign In</button> // raw HTML element
+<SignInButton mode="redirect"> // redirect instead of modal
+  <Button>Sign In</Button>
+</SignInButton>
+```
